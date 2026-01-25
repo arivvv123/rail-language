@@ -1,0 +1,20 @@
+(* rail_compiler/grammar.rail *)
+(* Базовые токены *)
+keyword = "fn" | "var" | "val" | "println" | "if" | "else" | "for" | "while" | "return";
+number = digit, {digit};
+string = '"', {any_char}, '"';
+ident = letter, {letter | digit | "_"};
+
+(* Основные правила *)
+program = {function};
+function = "fn", ident, "(", ")", block;
+
+block = "{", {statement}, "}";
+statement = var_decl | print | ";";
+
+var_decl = ("var" | "val"), ident, ["=", expr], ";";
+print = "println", "(", [expr, {",", expr}], ")", ";";
+
+expr = term, {("+" | "-" | ">" | "<" | "=="), term};
+term = factor, {("*" | "/"), factor};
+factor = number | string | ident;
