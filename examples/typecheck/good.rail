@@ -1,5 +1,17 @@
 fn main() {
-    val x = 42;
-    val y = x + 10;
-    println("Result:", y > 50 && true);
+    val a = 10;
+    val b = 20;
+    val sum = a + b;
+    val is_big = sum > 25 && sum < 100;
+    
+    val s1 = "hello";
+    val s2 = "world";
+    val strings_equal = s1 == s2;
+    
+    val flag = true;
+    val check = flag || false;
+    
+    println("All type checks passed!");
+    println("sum:", sum, "is_big:", is_big);
+    println("strings_equal:", strings_equal, "check:", check);
 }
