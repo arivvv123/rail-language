@@ -1,0 +1,4 @@
+fn main() {
+    val x = "hello";
+    val y = x + 10;
+}
