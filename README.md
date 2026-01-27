@@ -3,7 +3,7 @@
 
 Status: *In development*
 
-Version: **V0.1**
+Version: **V0.2**
 
 ## Features (planned)
 - Static typing with type inference
