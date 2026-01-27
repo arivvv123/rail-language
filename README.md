@@ -14,8 +14,10 @@ Version: **V0.1**
 
 ## Building & Running
 1. Clone repo: `git clone https://github.com/arivvv123/rail-language`
-2. Run compiler: `python rail_compiler/compiler.py input.rail`
-3. Output: `output.c` → compile with GCC: `gcc output.c -o program`
+2. Got to the project's folder: `cd rail-language`
+3.  **Note**: The project uses only standard Python libraries. No external packages are required (see empty `requirements.txt`).
+4. Run compiler: `python rail_compiler/compiler.py input.rail`
+5. Output: `output.c` → compile with GCC: `gcc output.c -o program`
 
 ## License
     Rail - programming language for fast computing
