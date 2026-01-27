@@ -38,7 +38,7 @@ def generate_statement(stmt):
                 # Убираем кавычки для формата %s
                 str_content = arg['value'][1:-1]
                 formats.append("%s")
-                args.append(f'"{str_content}"')
+                args.append(f'{str_content}')
             elif arg['type'] == 'bool':
                 formats.append("%s")
                 args.append(f'({arg_c} ? "true" : "false")')
