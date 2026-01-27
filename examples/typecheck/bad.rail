@@ -1,4 +1,13 @@
 fn main() {
-    val x = "hello";
-    val y = x + 10;
+    val x = "hello" + 42;
+    
+    val y = z * 10;
+    
+    val a = true;
+    val b = false;
+    val c = a + b;
+    
+    val num = 5;
+    val str = "five";
+    val wrong = num == str;
 }
