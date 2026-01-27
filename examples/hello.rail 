@@ -1,0 +1,4 @@
+fn main() {
+    val x = 12;
+    println("Hello Rail!", x);
+}
