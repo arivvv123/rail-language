@@ -74,7 +74,7 @@ class Parser:
         
         if self.peek() and self.peek()[1] == '=':
             self.consume('ASSIGN', '=')
-            value = self.parse_expr()
+            value = self.parse_logic()  # ИЗМЕНЕНО: было parse_expr()
         
         self.consume('SEMI', ';')
         return {
@@ -90,18 +90,63 @@ class Parser:
         
         args = []
         if self.peek() and self.peek()[1] != ')':
-            args.append(self.parse_expr())
+            args.append(self.parse_logic())  # ИЗМЕНЕНО: было parse_expr()
             
             while self.peek() and self.peek()[1] == ',':
                 self.consume('COMMA', ',')
-                args.append(self.parse_expr())
+                args.append(self.parse_logic())  # ИЗМЕНЕНО: было parse_expr()
         
         self.consume('RPAR', ')')
         self.consume('SEMI', ';')
         return {'type': 'print', 'args': args}
     
+    # ===== НОВАЯ ИЕРАРХИЯ ПАРСИНГА ВЫРАЖЕНИЙ =====
+    def parse_logic(self):
+        """Парсит логические операторы && и || (самый низкий приоритет)"""
+        node = self.parse_comparison()
+        
+        while self.peek() and self.peek()[1] in ('&&', '||'):
+            op = self.consume()[1]
+            right = self.parse_comparison()
+            node = {'type': 'binop', 'op': op, 'left': node, 'right': right}
+        
+        return node
+    
+    def parse_comparison(self):
+        """Парсит операторы сравнения ==, !=, <, >"""
+        node = self.parse_expr()
+        
+        while self.peek() and self.peek()[1] in ('==', '!=', '<', '>'):
+            op = self.consume()[1]
+            right = self.parse_expr()
+            node = {'type': 'binop', 'op': op, 'left': node, 'right': right}
+        
+        return node
+    
     def parse_expr(self):
-        # Упрощённо — пока только числа, строки, переменные
+        """Парсит сложение и вычитание (+, -)"""
+        node = self.parse_term()
+        
+        while self.peek() and self.peek()[1] in ('+', '-'):
+            op = self.consume()[1]
+            right = self.parse_term()
+            node = {'type': 'binop', 'op': op, 'left': node, 'right': right}
+        
+        return node
+    
+    def parse_term(self):
+        """Парсит умножение и деление (*, /) — высший приоритет"""
+        node = self.parse_factor()
+        
+        while self.peek() and self.peek()[1] in ('*', '/'):
+            op = self.consume()[1]
+            right = self.parse_factor()
+            node = {'type': 'binop', 'op': op, 'left': node, 'right': right}
+        
+        return node
+    
+    def parse_factor(self):
+        """Парсит атомарные значения и выражения в скобках"""
         token = self.peek()
         
         if token[0] == 'NUMBER':
@@ -113,13 +158,20 @@ class Parser:
         elif token[0] == 'IDENT':
             self.consume('IDENT')
             return {'type': 'ident', 'value': token[1]}
+        elif token[1] == '(':
+            self.consume('LPAR', '(')
+            expr = self.parse_logic()  # Рекурсивно парсим выражение в скобках
+            self.consume('RPAR', ')')
+            return expr
         else:
-            # TODO: Добавить арифметику и скобки
             raise SyntaxError(f"Unexpected expression: {token}")
 
 # Тест
 if __name__ == "__main__":
     from lexer import tokenize
+    
+    # Тест 1: Старый пример (должен работать)
+    print("=== Тест 1: Старая программа ===")
     code = """
     fn main() {
         var x = 10;
@@ -129,4 +181,28 @@ if __name__ == "__main__":
     tokens = tokenize(code)
     parser = Parser(tokens)
     ast = parser.parse()
-    print("AST:", ast)
+    print("✅ AST создан успешно")
+    
+    # Тест 2: Новые операторы
+    print("\n=== Тест 2: Новые операторы ===")
+    test_expr = "a == b && c > 5"
+    tokens = tokenize(test_expr)
+    parser = Parser(tokens)
+    try:
+        ast = parser.parse_logic()
+        print("✅ Выражение распарсено")
+        print("   AST:", ast)
+    except SyntaxError as e:
+        print("❌ Ошибка:", e)
+    
+    # Тест 3: Приоритет операторов
+    print("\n=== Тест 3: Приоритет операторов ===")
+    test_expr = "2 + 3 * 4 == 14 && 5 < 10"
+    tokens = tokenize(test_expr)
+    parser = Parser(tokens)
+    try:
+        ast = parser.parse_logic()
+        print("✅ Приоритеты соблюдены")
+        print("   AST:", ast)
+    except SyntaxError as e:
+        print("❌ Ошибка:", e)
