@@ -5,17 +5,31 @@ import os
 from lexer import tokenize
 from parser import Parser
 from codegen import generate_c
+from typechecker import TypeChecker  # <-- НОВЫЙ ИМПОРТ
 
 def compile_rail(source_code, input_filename="<stdin>"):
     """Основная функция компиляции"""
     try:
+        # 1. Лексический анализ (разбиваем на токены)
         tokens = tokenize(source_code)
+        
+        # 2. Синтаксический анализ (строим AST)
         parser = Parser(tokens)
         ast = parser.parse()
+        
+        # 3. ПРОВЕРКА ТИПОВ (НОВЫЙ ЭТАП!)
+        typechecker = TypeChecker()
+        typechecker.check(ast)  # Выбросит TypeError при ошибке типов
+        
+        # 4. Генерация C-кода (только если типы корректны)
         return generate_c(ast)
+        
     except Exception as e:
-        # Добавляем информацию о файле в ошибку
-        raise Exception(f"Compilation error in {input_filename}: {e}")
+        # Улучшаем сообщения об ошибках типа
+        error_msg = str(e)
+        if "TypeError" in str(type(e)) or "type" in error_msg.lower():
+            error_msg = f"Type error: {error_msg}"
+        raise Exception(f"Compilation error in {input_filename}: {error_msg}")
 
 def get_source_code():
     """Определяет, откуда брать исходный код с поддержкой мобильной разработки"""
@@ -77,7 +91,7 @@ def main():
         sys.exit("Error: No code to compile.")
     
     try:
-        # Компилируем
+        # Компилируем (теперь с проверкой типов!)
         c_code = compile_rail(source_code, input_name)
         
         # Сохраняем результат
