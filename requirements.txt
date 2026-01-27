@@ -1,2 +1,0 @@
-pip install re
-pip install sys
