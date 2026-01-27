@@ -1,4 +1,6 @@
+
 # rail_compiler/codegen.py
+
 def generate_c(ast):
     """Генерирует C-код из AST"""
     parts = ["#include <stdio.h>", "#include <stdbool.h>", ""]
@@ -33,9 +35,14 @@ def generate_statement(stmt):
         for arg in stmt['args']:
             arg_c = generate_expr(arg)
             if arg['type'] == 'string':
+                # Убираем кавычки для формата %s
+                str_content = arg['value'][1:-1]
                 formats.append("%s")
-                args.append(arg_c)
-            else:
+                args.append(f'"{str_content}"')
+            elif arg['type'] == 'bool':
+                formats.append("%s")
+                args.append(f'({arg_c} ? "true" : "false")')
+            else:  # number, ident, binop
                 formats.append("%d")
                 args.append(arg_c)
         
@@ -45,6 +52,54 @@ def generate_statement(stmt):
     return ""
 
 def generate_expr(expr):
-    if expr['type'] == 'string':
-        return expr['value']  # Уже в кавычках
-    return expr['value']
+    """Генерирует C-код для выражения"""
+    
+    if expr['type'] == 'number':
+        return expr['value']
+    
+    elif expr['type'] == 'string':
+        # Возвращаем строку как есть (в кавычках)
+        return expr['value']
+    
+    elif expr['type'] == 'ident':
+        return expr['value']
+    
+    elif expr['type'] == 'bool':
+        return "true" if expr['value'] == 'true' else "false"
+    
+    elif expr['type'] == 'binop':
+        left = generate_expr(expr['left'])
+        right = generate_expr(expr['right'])
+        op = expr['op']
+        
+        # Маппинг операторов Rail -> C
+        c_op = {
+            '+': '+', '-': '-', '*': '*', '/': '/',
+            '==': '==', '!=': '!=', '<': '<', '>': '>',
+            '&&': '&&', '||': '||'
+        }.get(op, op)  # Если оператор не найден, используем как есть
+        
+        return f"({left} {c_op} {right})"
+    
+    else:
+        # На случай, если встретится неизвестный тип
+        raise ValueError(f"Unsupported expression type in codegen: {expr['type']}")
+
+# Простой тест
+if __name__ == "__main__":
+    # Тестовое AST для выражения: (2 + 3) == 5
+    test_ast = {
+        'type': 'binop',
+        'op': '==',
+        'left': {
+            'type': 'binop',
+            'op': '+',
+            'left': {'type': 'number', 'value': '2'},
+            'right': {'type': 'number', 'value': '3'}
+        },
+        'right': {'type': 'number', 'value': '5'}
+    }
+    
+    print("Тест генерации выражения:")
+    print(generate_expr(test_ast))
+    # Ожидаемый вывод: ((2 + 3) == 5)
