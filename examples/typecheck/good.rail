@@ -1,0 +1,5 @@
+fn main() {
+    val x = 42;
+    val y = x + 10;
+    println("Result:", y > 50 && true);
+}
