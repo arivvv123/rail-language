@@ -1,4 +1,6 @@
 fn main() {
-    val x = 12;
-    println("Hello Rail!", x);
+    println("Hello, Rail!");
+    val x = 42;
+    val result = x * 2;
+    println("The answer is:", result);
 }
