@@ -19,6 +19,10 @@ Version: **V0.2**
 4. Run compiler: `python rail_compiler/compiler.py input.rail`
 5. Output: `output.c` → compile with GCC: `gcc output.c -o program`
 
+### Issues & Contributions
+Found a bug? Open an [issue](https://github.com/arivvv123/rail-language/issues).
+Want to contribute? Check the source code!
+
 ## License
     Rail - programming language for fast computing
     Copyright (C) 2026  arivvv
