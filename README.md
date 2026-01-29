@@ -19,6 +19,20 @@ Version: **V0.2**
 4. Run compiler: `python rail_compiler/compiler.py input.rail`
 5. Output: `output.c` → compile with GCC: `gcc output.c -o program`
 
+## Rail Design Principles
+
+1.  **Explicit over implicit** — always state intent explicitly.  
+    *Example:* Mandatory `else` in expressions, no implicit type conversions.
+
+2.  **Safety without GC** — static checking, but manual memory management.  
+    *Example:* Compile-time type checking, but no automatic garbage collection.
+
+3.  **Minimalism** — features are included only if they are essential.  
+    *Example:* No operator overloading, no exceptions (only `Result` types).
+
+4.  **Learnability** — syntax should be predictable.  
+    *Example:* Consistent `if/elif/else` structure, no surprising context-dependent rules.
+
 ### Issues & Contributions
 Found a bug? Open an [issue](https://github.com/arivvv123/rail-language/issues).
 Want to contribute? Check the source code!
