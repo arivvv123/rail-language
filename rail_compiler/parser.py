@@ -1,4 +1,3 @@
-# rail_compiler/parser.py
 from lexer import tokenize
 
 class Parser:
@@ -67,21 +66,32 @@ class Parser:
         else:
             raise SyntaxError(f"Unexpected statement: {token}")
     
+    # ===== ОБНОВЛЁННЫЙ МЕТОД =====
     def parse_var_decl(self):
         mutable = self.consume('KEYWORD')[1]  # var/val
         name = self.consume('IDENT')[1]
-        value = None
         
+        # Явный тип (необязательный)
+        explicit_type = None
+        if self.peek() and self.peek()[1] == ':':
+            self.consume('COLON', ':')
+            type_token = self.consume('TYPE')  # int/bool/string
+            explicit_type = type_token[1]
+        
+        # Значение (необязательное)
+        value = None
         if self.peek() and self.peek()[1] == '=':
             self.consume('ASSIGN', '=')
-            value = self.parse_logic()  # ИЗМЕНЕНО: было parse_expr()
+            value = self.parse_logic()
         
         self.consume('SEMI', ';')
+        
         return {
             'type': 'var_decl',
             'mutable': mutable,
             'name': name,
-            'value': value or {'type': 'number', 'value': '0'}
+            'explicit_type': explicit_type,  # Сохраняем
+            'value': value
         }
     
     def parse_print(self):
@@ -90,19 +100,18 @@ class Parser:
         
         args = []
         if self.peek() and self.peek()[1] != ')':
-            args.append(self.parse_logic())  # ИЗМЕНЕНО: было parse_expr()
+            args.append(self.parse_logic())
             
             while self.peek() and self.peek()[1] == ',':
                 self.consume('COMMA', ',')
-                args.append(self.parse_logic())  # ИЗМЕНЕНО: было parse_expr()
+                args.append(self.parse_logic())
         
         self.consume('RPAR', ')')
         self.consume('SEMI', ';')
         return {'type': 'print', 'args': args}
     
-    # ===== НОВАЯ ИЕРАРХИЯ ПАРСИНГА ВЫРАЖЕНИЙ =====
+    # Иерархия парсинга выражений
     def parse_logic(self):
-        """Парсит логические операторы && и || (самый низкий приоритет)"""
         node = self.parse_comparison()
         
         while self.peek() and self.peek()[1] in ('&&', '||'):
@@ -113,7 +122,6 @@ class Parser:
         return node
     
     def parse_comparison(self):
-        """Парсит операторы сравнения ==, !=, <, >"""
         node = self.parse_expr()
         
         while self.peek() and self.peek()[1] in ('==', '!=', '<', '>'):
@@ -124,7 +132,6 @@ class Parser:
         return node
     
     def parse_expr(self):
-        """Парсит сложение и вычитание (+, -)"""
         node = self.parse_term()
         
         while self.peek() and self.peek()[1] in ('+', '-'):
@@ -135,7 +142,6 @@ class Parser:
         return node
     
     def parse_term(self):
-        """Парсит умножение и деление (*, /) — высший приоритет"""
         node = self.parse_factor()
         
         while self.peek() and self.peek()[1] in ('*', '/'):
@@ -146,7 +152,6 @@ class Parser:
         return node
     
     def parse_factor(self):
-        """Парсит атомарные значения и выражения в скобках"""
         token = self.peek()
         
         if token[0] == 'NUMBER':
@@ -160,49 +165,30 @@ class Parser:
             return {'type': 'ident', 'value': token[1]}
         elif token[1] == '(':
             self.consume('LPAR', '(')
-            expr = self.parse_logic()  # Рекурсивно парсим выражение в скобках
+            expr = self.parse_logic()
             self.consume('RPAR', ')')
             return expr
         else:
             raise SyntaxError(f"Unexpected expression: {token}")
 
-# Тест
 if __name__ == "__main__":
     from lexer import tokenize
     
-    # Тест 1: Старый пример (должен работать)
-    print("=== Тест 1: Старая программа ===")
+    print("=== Тест явных типов ===")
     code = """
     fn main() {
-        var x = 10;
-        println("Hello", x);
+        var x: int = 10;
+        val name: string = "Rail";
+        var flag: bool = true;
+        println(x, name, flag);
     }
     """
     tokens = tokenize(code)
     parser = Parser(tokens)
     ast = parser.parse()
     print("✅ AST создан успешно")
-    
-    # Тест 2: Новые операторы
-    print("\n=== Тест 2: Новые операторы ===")
-    test_expr = "a == b && c > 5"
-    tokens = tokenize(test_expr)
-    parser = Parser(tokens)
-    try:
-        ast = parser.parse_logic()
-        print("✅ Выражение распарсено")
-        print("   AST:", ast)
-    except SyntaxError as e:
-        print("❌ Ошибка:", e)
-    
-    # Тест 3: Приоритет операторов
-    print("\n=== Тест 3: Приоритет операторов ===")
-    test_expr = "2 + 3 * 4 == 14 && 5 < 10"
-    tokens = tokenize(test_expr)
-    parser = Parser(tokens)
-    try:
-        ast = parser.parse_logic()
-        print("✅ Приоритеты соблюдены")
-        print("   AST:", ast)
-    except SyntaxError as e:
-        print("❌ Ошибка:", e)
+    for func in ast['functions']:
+        print(f"Функция: {func['name']}")
+        for stmt in func['body']['statements']:
+            if stmt and stmt['type'] == 'var_decl':
+                print(f"  Переменная: {stmt['name']}, тип: {stmt['explicit_type']}, значение: {stmt['value']}")
