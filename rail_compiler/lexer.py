@@ -1,4 +1,3 @@
-# rail_compiler/lexer.py
 import re
 
 TOKEN_SPEC = [
@@ -32,7 +31,7 @@ TOKEN_SPEC = [
     # Одиночные символы
     ('ASSIGN',  r'='),
     ('NOT',     r'!'),
-    ('COLON',   r':'),  # НОВОЕ: для явных типов
+    ('COLON',   r':'),
 
     # Скобки и пунктуация
     ('LPAR',    r'\('),
@@ -42,13 +41,18 @@ TOKEN_SPEC = [
     ('COMMA',   r','),
     ('SEMI',    r';'),
 
-    # Пропускаем комментарии и пробелы
-    ('SKIP',    r'#.*|\s+'),
+    # Пропускаем комментарии и пробелы (НО НЕ ПЕРЕВОДЫ СТРОК!)
+    ('SKIP',    r'#.*|[ \t]+'),  # пробелы и табы, но не \n
+    ('NEWLINE', r'\n'),           # считаем переводы строк отдельно
 ]
 
 def tokenize(code):
     tokens = []
     pos = 0
+    line = 1
+    col = 1
+    
+    # Компилируем регулярки
     regexes = [(name, re.compile(pattern)) for name, pattern in TOKEN_SPEC]
     
     while pos < len(code):
@@ -57,13 +61,26 @@ def tokenize(code):
             match = regex.match(code, pos)
             if match:
                 text = match.group(0)
-                if name != 'SKIP':
-                    tokens.append((name, text))
-                pos = match.end()
-                break
+                
+                if name == 'NEWLINE':
+                    line += 1
+                    col = 1
+                    pos = match.end()
+                    break
+                elif name != 'SKIP':
+                    # Сохраняем токен с позицией
+                    tokens.append((name, text, line, col))
+                    col += len(text)
+                    pos = match.end()
+                    break
+                else:
+                    # SKIP (пробелы, табы, комментарии) — просто увеличиваем колонку
+                    col += len(text)
+                    pos = match.end()
+                    break
         
         if not match:
-            raise SyntaxError(f"Invalid char: {code[pos]}")
+            raise SyntaxError(f"Invalid character '{code[pos]}' at line {line}, column {col}")
     
     return tokens
 
@@ -71,4 +88,12 @@ if __name__ == "__main__":
     test_code = 'var x: int = 10;'
     print("Тестируем:", test_code)
     for tok in tokenize(test_code):
+        print(f"  {tok}")
+    
+    print("\nТест с несколькими строками:")
+    test_code2 = """fn main() {
+    var x: int = 10;
+    println(x);
+}"""
+    for tok in tokenize(test_code2):
         print(f"  {tok}")
