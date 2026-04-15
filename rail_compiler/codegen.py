@@ -1,4 +1,3 @@
-
 # rail_compiler/codegen.py
 
 def generate_c(ast):
@@ -35,10 +34,8 @@ def generate_statement(stmt):
         for arg in stmt['args']:
             arg_c = generate_expr(arg)
             if arg['type'] == 'string':
-                # Убираем кавычки для формата %s
-                str_content = arg['value'][1:-1]
                 formats.append("%s")
-                args.append(f'{str_content}')
+                args.append(arg['value'])   # оставляем кавычки
             elif arg['type'] == 'bool':
                 formats.append("%s")
                 args.append(f'({arg_c} ? "true" : "false")')
