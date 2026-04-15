@@ -14,10 +14,12 @@ class Parser:
             raise SyntaxError("Unexpected EOF")
         
         if expected_type and token[0] != expected_type:
-            raise SyntaxError(f"Expected {expected_type}, got {token[0]}")
+            _, _, line, col = token
+            raise SyntaxError(f"Expected {expected_type}, got {token[0]} at line {line}, column {col}")
         
         if expected_value and token[1] != expected_value:
-            raise SyntaxError(f"Expected '{expected_value}', got '{token[1]}'")
+            _, _, line, col = token
+            raise SyntaxError(f"Expected '{expected_value}', got '{token[1]}' at line {line}, column {col}")
         
         self.pos += 1
         return token
@@ -29,17 +31,20 @@ class Parser:
             if self.peek()[1] == 'fn':
                 ast['functions'].append(self.parse_function())
             else:
-                raise SyntaxError(f"Unexpected token: {self.peek()}")
+                token = self.peek()
+                _, _, line, col = token
+                raise SyntaxError(f"Unexpected token {token[1]} at line {line}, column {col}")
         
         return ast
     
     def parse_function(self):
         self.consume('KEYWORD', 'fn')
-        name = self.consume('IDENT')[1]
+        name_token = self.consume('IDENT')
+        name = name_token[1]
         self.consume('LPAR', '(')
         self.consume('RPAR', ')')
         body = self.parse_block()
-        return {'type': 'function', 'name': name, 'body': body}
+        return {'type': 'function', 'name': name, 'body': body, 'line': name_token[2]}
     
     def parse_block(self):
         self.consume('LBRACE', '{')
@@ -64,21 +69,21 @@ class Parser:
             self.consume('SEMI', ';')
             return None
         else:
-            raise SyntaxError(f"Unexpected statement: {token}")
+            _, _, line, col = token
+            raise SyntaxError(f"Unexpected statement {token[1]} at line {line}, column {col}")
     
-    # ===== ОБНОВЛЁННЫЙ МЕТОД =====
     def parse_var_decl(self):
-        mutable = self.consume('KEYWORD')[1]  # var/val
-        name = self.consume('IDENT')[1]
+        mutable_token = self.consume('KEYWORD')
+        name_token = self.consume('IDENT')
+        name = name_token[1]
+        line = name_token[2]
         
-        # Явный тип (необязательный)
         explicit_type = None
         if self.peek() and self.peek()[1] == ':':
             self.consume('COLON', ':')
-            type_token = self.consume('TYPE')  # int/bool/string
+            type_token = self.consume('TYPE')
             explicit_type = type_token[1]
         
-        # Значение (необязательное)
         value = None
         if self.peek() and self.peek()[1] == '=':
             self.consume('ASSIGN', '=')
@@ -88,67 +93,63 @@ class Parser:
         
         return {
             'type': 'var_decl',
-            'mutable': mutable,
+            'mutable': mutable_token[1],
             'name': name,
-            'explicit_type': explicit_type,  # Сохраняем
-            'value': value
+            'explicit_type': explicit_type,
+            'value': value,
+            'line': line
         }
     
     def parse_print(self):
-        self.consume('KEYWORD', 'println')
+        println_token = self.consume('KEYWORD', 'println')
+        line = println_token[2]
         self.consume('LPAR', '(')
         
         args = []
         if self.peek() and self.peek()[1] != ')':
             args.append(self.parse_logic())
-            
             while self.peek() and self.peek()[1] == ',':
                 self.consume('COMMA', ',')
                 args.append(self.parse_logic())
         
         self.consume('RPAR', ')')
         self.consume('SEMI', ';')
-        return {'type': 'print', 'args': args}
+        return {'type': 'print', 'args': args, 'line': line}
     
-    # Иерархия парсинга выражений
     def parse_logic(self):
         node = self.parse_comparison()
-        
         while self.peek() and self.peek()[1] in ('&&', '||'):
-            op = self.consume()[1]
+            op_token = self.consume()
+            op = op_token[1]
             right = self.parse_comparison()
             node = {'type': 'binop', 'op': op, 'left': node, 'right': right}
-        
         return node
     
     def parse_comparison(self):
         node = self.parse_expr()
-        
         while self.peek() and self.peek()[1] in ('==', '!=', '<', '>'):
-            op = self.consume()[1]
+            op_token = self.consume()
+            op = op_token[1]
             right = self.parse_expr()
             node = {'type': 'binop', 'op': op, 'left': node, 'right': right}
-        
         return node
     
     def parse_expr(self):
         node = self.parse_term()
-        
         while self.peek() and self.peek()[1] in ('+', '-'):
-            op = self.consume()[1]
+            op_token = self.consume()
+            op = op_token[1]
             right = self.parse_term()
             node = {'type': 'binop', 'op': op, 'left': node, 'right': right}
-        
         return node
     
     def parse_term(self):
         node = self.parse_factor()
-        
         while self.peek() and self.peek()[1] in ('*', '/'):
-            op = self.consume()[1]
+            op_token = self.consume()
+            op = op_token[1]
             right = self.parse_factor()
             node = {'type': 'binop', 'op': op, 'left': node, 'right': right}
-        
         return node
     
     def parse_factor(self):
@@ -163,13 +164,17 @@ class Parser:
         elif token[0] == 'IDENT':
             self.consume('IDENT')
             return {'type': 'ident', 'value': token[1]}
+        elif token[0] == 'KEYWORD' and token[1] in ('true', 'false'):
+            self.consume('KEYWORD')
+            return {'type': 'bool', 'value': token[1]}
         elif token[1] == '(':
             self.consume('LPAR', '(')
             expr = self.parse_logic()
             self.consume('RPAR', ')')
             return expr
         else:
-            raise SyntaxError(f"Unexpected expression: {token}")
+            _, _, line, col = token
+            raise SyntaxError(f"Unexpected expression {token[1]} at line {line}, column {col}")
 
 if __name__ == "__main__":
     from lexer import tokenize
@@ -188,7 +193,9 @@ if __name__ == "__main__":
     ast = parser.parse()
     print("✅ AST создан успешно")
     for func in ast['functions']:
-        print(f"Функция: {func['name']}")
+        print(f"Функция: {func['name']} (строка {func['line']})")
         for stmt in func['body']['statements']:
             if stmt and stmt['type'] == 'var_decl':
-                print(f"  Переменная: {stmt['name']}, тип: {stmt['explicit_type']}, значение: {stmt['value']}")
+                print(f"  Переменная: {stmt['name']} (строка {stmt['line']}), тип: {stmt['explicit_type']}, значение: {stmt['value']}")
+            elif stmt and stmt['type'] == 'print':
+                print(f"  println (строка {stmt['line']})")
