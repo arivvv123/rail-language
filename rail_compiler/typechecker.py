@@ -10,7 +10,13 @@ class TypeChecker:
     def check_function(self, func):
         local_table = {}
         self.symbol_table = local_table
-        self.check_block(func['body'])
+        try:
+            self.check_block(func['body'])
+        except TypeError as e:
+            # Добавляем позицию функции, если её нет в ошибке
+            if 'line' in func:
+                raise TypeError(f"{e} (in function '{func['name']}' at line {func['line']})")
+            raise
         self.symbol_table = {}
     
     def check_block(self, block):
@@ -25,14 +31,17 @@ class TypeChecker:
             return self.check_print(stmt)
         return None
     
-    # ===== ОБНОВЛЁННЫЙ МЕТОД =====
     def check_var_decl(self, decl):
         var_name = decl['name']
+        line = decl.get('line', 'unknown')
         
         # Если есть значение, выводим тип
         inferred_type = None
         if decl['value']:
-            inferred_type = self.infer_expr_type(decl['value'])
+            try:
+                inferred_type = self.infer_expr_type(decl['value'])
+            except TypeError as e:
+                raise TypeError(f"{e} (in variable '{var_name}' at line {line})")
         
         explicit_type = decl.get('explicit_type')
         
@@ -40,26 +49,30 @@ class TypeChecker:
         if explicit_type and inferred_type:
             if explicit_type != inferred_type:
                 raise TypeError(
-                    f"Type mismatch: variable '{var_name}' "
+                    f"Type mismatch in variable '{var_name}' at line {line}: "
                     f"declared as {explicit_type} but got {inferred_type}"
                 )
         
         # Если нет значения, но есть явный тип — ок
-        # Если нет значения и нет явного типа — ошибка (нельзя объявить без типа)
+        # Если нет значения и нет явного типа — ошибка
         if not explicit_type and not inferred_type:
             raise TypeError(
-                f"Cannot infer type for variable '{var_name}'. "
+                f"Cannot infer type for variable '{var_name}' at line {line}. "
                 f"Please specify type explicitly."
             )
         
-        # Сохраняем тип (явный или выведенный)
+        # Сохраняем тип
         final_type = explicit_type or inferred_type
         self.symbol_table[var_name] = final_type
         return final_type
     
     def check_print(self, stmt):
+        line = stmt.get('line', 'unknown')
         for arg in stmt['args']:
-            self.infer_expr_type(arg)
+            try:
+                self.infer_expr_type(arg)
+            except TypeError as e:
+                raise TypeError(f"{e} (in println at line {line})")
         return None
     
     def infer_expr_type(self, expr):
@@ -70,17 +83,22 @@ class TypeChecker:
         elif expr['type'] == 'bool':
             return 'bool'
         elif expr['type'] == 'ident':
-            if expr['value'] in self.symbol_table:
-                return self.symbol_table[expr['value']]
-            raise TypeError(f"Undefined variable: {expr['value']}")
+            var_name = expr['value']
+            if var_name in self.symbol_table:
+                return self.symbol_table[var_name]
+            raise TypeError(f"Undefined variable: '{var_name}'")
         elif expr['type'] == 'binop':
             return self.check_binop(expr)
         else:
             raise TypeError(f"Unknown expression type: {expr['type']}")
     
     def check_binop(self, expr):
-        left_type = self.infer_expr_type(expr['left'])
-        right_type = self.infer_expr_type(expr['right'])
+        try:
+            left_type = self.infer_expr_type(expr['left'])
+            right_type = self.infer_expr_type(expr['right'])
+        except TypeError as e:
+            raise TypeError(f"In binary operation: {e}")
+        
         op = expr['op']
         
         valid_ops = {
@@ -92,10 +110,15 @@ class TypeChecker:
         type_pair = (left_type, right_type)
         
         if type_pair not in valid_ops:
-            raise TypeError(f"Invalid operation between {left_type} and {right_type}")
+            raise TypeError(
+                f"Invalid operation between {left_type} and {right_type} "
+                f"(operator '{op}')"
+            )
         
         if op not in valid_ops[type_pair]:
-            raise TypeError(f"Operator '{op}' not supported for {left_type}")
+            raise TypeError(
+                f"Operator '{op}' not supported for {left_type}"
+            )
         
         if op in ['&&', '||', '==', '!=', '<', '>']:
             return 'bool'
@@ -106,7 +129,7 @@ if __name__ == "__main__":
     from lexer import tokenize
     from parser import Parser
     
-    print("=== Тест проверки типов с явными типами ===")
+    print("=== Тест проверки типов с позициями ===")
     
     # Корректный код
     code_ok = """
@@ -114,6 +137,7 @@ if __name__ == "__main__":
         var x: int = 10;
         val name: string = "Rail";
         var flag: bool = true;
+        println(x, name, flag);
     }
     """
     tokens = tokenize(code_ok)
@@ -123,13 +147,13 @@ if __name__ == "__main__":
     try:
         typechecker.check(ast)
         print("✅ OK: типы совпадают")
-    except Exception as e:
+    except TypeError as e:
         print(f"❌ Ошибка: {e}")
     
-    # Некорректный код
+    # Некорректный код с ошибкой типа
     code_bad = """
     fn main() {
-        var x: int = true;  // ошибка!
+        var x: int = true;
     }
     """
     tokens = tokenize(code_bad)
@@ -138,6 +162,22 @@ if __name__ == "__main__":
     typechecker = TypeChecker()
     try:
         typechecker.check(ast)
-        print("✅ OK: типы совпадают (не должно быть!)")
-    except Exception as e:
+        print("❌ Ошибка не поймана (плохо)")
+    except TypeError as e:
+        print(f"✅ Ошибка поймана: {e}")
+    
+    # Некорректный код с необъявленной переменной
+    code_undef = """
+    fn main() {
+        var x: int = y;
+    }
+    """
+    tokens = tokenize(code_undef)
+    parser = Parser(tokens)
+    ast = parser.parse()
+    typechecker = TypeChecker()
+    try:
+        typechecker.check(ast)
+        print("❌ Ошибка не поймана (плохо)")
+    except TypeError as e:
         print(f"✅ Ошибка поймана: {e}")
